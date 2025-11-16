@@ -3,6 +3,30 @@ import PyPDF2
 import pytesseract
 from PIL import Image
 import streamlit as st
+import docx
+
+# Define a file size limit in bytes (e.g., 10MB)
+MAX_FILE_SIZE = 10 * 1024 * 1024
+
+
+def extract_text_from_docx(docx_file):
+    """Extract text from a DOCX file."""
+    try:
+        doc = docx.Document(docx_file)
+        return "\n\n".join([paragraph.text for paragraph in doc.paragraphs])
+    except Exception:
+        st.error("Error extracting text from DOCX file.")
+        return ""
+
+
+def extract_text_from_txt(txt_file):
+    """Extract text from a TXT file."""
+    try:
+        return txt_file.read().decode("utf-8")
+    except Exception:
+        st.error("Error extracting text from TXT file.")
+        return ""
+
 
 def extract_text_from_pdf(pdf_file):
     """Extract text from a PDF file."""
@@ -35,6 +59,11 @@ def process_file(uploaded_file):
     if uploaded_file is None:
         return ""
     
+    # Check if the file size is within the limit
+    if uploaded_file.size > MAX_FILE_SIZE:
+        st.error(f"File size exceeds the limit of {MAX_FILE_SIZE / (1024 * 1024)} MB.")
+        return ""
+
     # Get the file type
     file_type = uploaded_file.type
     
@@ -43,6 +72,10 @@ def process_file(uploaded_file):
         return extract_text_from_pdf(uploaded_file)
     elif "image" in file_type:
         return extract_text_from_image(uploaded_file)
+    elif "vnd.openxmlformats-officedocument.wordprocessingml.document" in file_type:
+        return extract_text_from_docx(uploaded_file)
+    elif "text/plain" in file_type:
+        return extract_text_from_txt(uploaded_file)
     else:
-        st.error("Unsupported file type. Please upload a PDF or image file.")
+        st.error("Unsupported file type. Please upload a PDF, image, DOCX, or TXT file.")
         return "" 

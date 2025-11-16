@@ -3,8 +3,8 @@ import time
 import logging
 import streamlit as st
 import google.generativeai as genai
-from dotenv import load_dotenv
 from file_processing import process_file
+from export_utils import export_as_pdf, export_as_markdown
 from gemini_utils import (
     configure_gemini,
     extract_summary,
@@ -19,14 +19,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Load environment variables
-load_dotenv()
-
 # Setup Gemini API key
-gemini_api_key = os.getenv("GEMINI_API_KEY")
-model = os.getenv("MODEL", "gemini-1.5-flash")  # Get model from env or use default
+gemini_api_key = st.secrets.get("GEMINI_API_KEY")
+model = st.secrets.get("MODEL", "gemini-1.5-flash")
+
+# Check for API key
 if not gemini_api_key:
-    logger.warning("GEMINI_API_KEY not found in .env file")
+    st.error("GEMINI_API_KEY is not set. Please add it to your secrets file.")
+    st.stop()
 
 # Initialize session state
 if 'generated_questions' not in st.session_state:
@@ -45,6 +45,13 @@ if 'summary' not in st.session_state:
     st.session_state.summary = ""
 if 'api_error' not in st.session_state:
     st.session_state.api_error = None
+if 'quiz_mode' not in st.session_state:
+    st.session_state.quiz_mode = False
+if 'current_question_index' not in st.session_state:
+    st.session_state.current_question_index = 0
+if 'user_answers' not in st.session_state:
+    st.session_state.user_answers = []
+
 
 # Helper Functions
 def summarize_text(text):
@@ -126,6 +133,46 @@ def switch_tab(tab_name):
     """Switch to a different tab."""
     st.session_state.active_tab = tab_name
 
+
+def start_quiz():
+    """Start the interactive quiz."""
+    st.session_state.quiz_mode = True
+    st.session_state.current_question_index = 0
+    st.session_state.user_answers = ["" for _ in st.session_state.generated_questions]
+
+
+def display_quiz():
+    """Display the interactive quiz."""
+    q_index = st.session_state.current_question_index
+    qa_pair = st.session_state.generated_questions[q_index]
+
+    st.markdown(f"**Question {q_index + 1}: {qa_pair['question']}**")
+
+    st.session_state.user_answers[q_index] = st.text_input("Your Answer", value=st.session_state.user_answers[q_index])
+
+    if st.button("Submit Answer"):
+        st.markdown(f"**Correct Answer:** {qa_pair['answer']}")
+
+    col1, col2 = st.columns(2)
+    if q_index > 0 and col1.button("Previous Question"):
+        st.session_state.current_question_index -= 1
+
+    if q_index < len(st.session_state.generated_questions) - 1 and col2.button("Next Question"):
+        st.session_state.current_question_index += 1
+
+    if st.button("Finish Quiz"):
+        st.session_state.quiz_mode = False
+
+
+def format_questions_for_export(questions):
+    """Format questions and answers for export."""
+    text = ""
+    for i, qa in enumerate(questions):
+        text += f"Q{i+1}: {qa['question']}\n"
+        text += f"A{i+1}: {qa['answer']}\n\n"
+    return text
+
+
 # UI
 st.title("DOC-SUM")
 
@@ -142,7 +189,7 @@ if col3.button("❓ Practice Questions"):
 if st.session_state.active_tab == "upload":
     st.header("Upload Your Study Material")
     
-    uploaded_file = st.file_uploader("Choose a PDF file or image", type=["pdf", "png", "jpg", "jpeg"])
+    uploaded_file = st.file_uploader("Choose a PDF, DOCX, TXT, or image file", type=["pdf", "docx", "txt", "png", "jpg", "jpeg"])
     
     col1, col2 = st.columns(2)
     process_button = col1.button("Process File")
@@ -189,6 +236,11 @@ elif st.session_state.active_tab == "summary":
     if st.session_state.summary:
         st.markdown(st.session_state.summary)
         
+        # Add export buttons
+        col1, col2 = st.columns(2)
+        col1.markdown(export_as_pdf(st.session_state.summary, "summary"), unsafe_allow_html=True)
+        col2.markdown(export_as_markdown(st.session_state.summary, "summary"), unsafe_allow_html=True)
+
         if st.button("Continue to Practice Questions"):
             switch_tab("practice")
     else:
@@ -225,15 +277,30 @@ elif st.session_state.active_tab == "practice":
         # Display questions
         if st.session_state.generated_questions:
             st.markdown("### Questions")
-            for i, qa_pair in enumerate(st.session_state.generated_questions):
-                st.markdown(f"**Q{i+1}: {qa_pair['question']}**")
-                
-                if st.session_state.show_answer:
-                    st.markdown(f"**A{i+1}:** {qa_pair['answer']}")
             
-            # Show/Hide answer button
-            if st.button("Show/Hide Answers"):
-                toggle_answer()
+            # Add a button to start the quiz
+            if not st.session_state.quiz_mode and st.button("Start Quiz"):
+                start_quiz()
+
+            if st.session_state.quiz_mode:
+                display_quiz()
+            else:
+                for i, qa_pair in enumerate(st.session_state.generated_questions):
+                    st.markdown(f"**Q{i+1}: {qa_pair['question']}**")
+
+                    if st.session_state.show_answer:
+                        st.markdown(f"**A{i+1}:** {qa_pair['answer']}")
+
+                # Show/Hide answer button
+                if st.button("Show/Hide Answers"):
+                    toggle_answer()
+
+        # Add export buttons for questions
+        if st.session_state.generated_questions:
+            questions_text = format_questions_for_export(st.session_state.generated_questions)
+            col1, col2 = st.columns(2)
+            col1.markdown(export_as_pdf(questions_text, "questions"), unsafe_allow_html=True)
+            col2.markdown(export_as_markdown(questions_text, "questions"), unsafe_allow_html=True)
         
         # Navigation buttons
         col1, col2 = st.columns(2)
