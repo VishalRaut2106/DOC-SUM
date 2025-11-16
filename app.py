@@ -3,7 +3,6 @@ import time
 import logging
 import streamlit as st
 import google.generativeai as genai
-from dotenv import load_dotenv
 from file_processing import process_file
 from gemini_utils import (
     configure_gemini,
@@ -19,14 +18,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Load environment variables
-load_dotenv()
-
 # Setup Gemini API key
-gemini_api_key = os.getenv("GEMINI_API_KEY")
-model = os.getenv("MODEL", "gemini-1.5-flash")  # Get model from env or use default
+gemini_api_key = st.secrets.get("GEMINI_API_KEY")
+model = st.secrets.get("MODEL", "gemini-1.5-flash")
+
+# Check for API key
 if not gemini_api_key:
-    logger.warning("GEMINI_API_KEY not found in .env file")
+    st.error("GEMINI_API_KEY is not set. Please add it to your secrets file.")
+    st.stop()
 
 # Initialize session state
 if 'generated_questions' not in st.session_state:

@@ -56,7 +56,10 @@ def extract_summary(text, model):
         # Prepare the prompt
         prompt = f"""Please provide a comprehensive summary of the following text, capturing all key points:
 
-{text}
+        Text to summarize:
+        ---
+        {text}
+        ---
 
 Your summary should:
 1. Be well-structured and easy to understand
@@ -107,7 +110,10 @@ def split_into_paragraphs(text, model, max_paragraphs=10):
         if len(paragraphs) > max_paragraphs:
             prompt = f"""Please reorganize the following text into {max_paragraphs} meaningful, well-structured paragraphs:
 
-{text}
+            Text to reorganize:
+            ---
+            {text}
+            ---
 
 Each paragraph should:
 1. Cover a specific topic or idea
@@ -186,8 +192,10 @@ def generate_questions(paragraph, model, num_questions=3):
         # Prepare the prompt
         prompt = f"""Based on the following paragraph, generate {num_questions} quiz questions that would test understanding of the key concepts. For each question, provide a detailed answer.
 
-Paragraph:
-{paragraph}
+        Paragraph to use for questions:
+        ---
+        {paragraph}
+        ---
 
 Format your response as follows:
 Q1: [Question 1]
