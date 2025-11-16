@@ -3,6 +3,9 @@ import PyPDF2
 import pytesseract
 from PIL import Image
 import streamlit as st
+# Define a file size limit in bytes (e.g., 10MB)
+MAX_FILE_SIZE = 10 * 1024 * 1024
+
 
 def extract_text_from_pdf(pdf_file):
     """Extract text from a PDF file."""
@@ -35,6 +38,11 @@ def process_file(uploaded_file):
     if uploaded_file is None:
         return ""
     
+    # Check if the file size is within the limit
+    if uploaded_file.size > MAX_FILE_SIZE:
+        st.error(f"File size exceeds the limit of {MAX_FILE_SIZE / (1024 * 1024)} MB.")
+        return ""
+
     # Get the file type
     file_type = uploaded_file.type
     
